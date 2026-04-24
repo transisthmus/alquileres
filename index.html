@@ -297,7 +297,7 @@ body{font-family:'Outfit',sans-serif;display:flex;justify-content:center;align-i
 
 <script>
 // ─── GOOGLE SHEETS CONFIG ─────────────────────────────────────────────────────
-const GS_URL = "https://script.google.com/macros/s/AKfycbx9s96Ps7yTrX_lwOaoLetE2_lV5oIAyFEWj2_624C6naVspNAwCxybzcH3_fjifbU/exec"; // ← pega aquí la URL del nuevo Apps Script;
+const GS_URL = "https://script.google.com/macros/s/AKfycbzNRR9Jq_oBoxvIRHLTbOPvx7ht9oPH-iAFL991GT90-ixLfOuY7aSrpAJeNQxdF4Ls/exec"; // ← pega aquí la URL del nuevo Apps Script;
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const COLORS=["#2563EB","#7C3AED","#D97706","#059669","#DC2626","#0891B2","#DB2777","#65A30D","#EA580C","#6366F1"];
@@ -396,27 +396,39 @@ function localLoad(){
 async function cloudSave(data){
   localSave();
   try{
-    const r=await fetch(GS_URL,{
+    await fetch(GS_URL,{
       method:"POST",
       headers:{"Content-Type":"text/plain"},
-      body:JSON.stringify(data)
+      body:JSON.stringify(data),
+      mode:"no-cors"
     });
-    const d=await r.json();
-    if(d.ok) showPill("✓ Guardado en Google Sheets");
-    else showPill("⚠️ Error al guardar","error");
+    showPill("✓ Guardado");
   }catch(e){
-    showPill("⚠️ Guardado local (sin conexión)","error");
+    showPill("⚠️ Solo guardado local","error");
   }
 }
 
-async function cloudLoad(){
-  try{
-    const r=await fetch(GS_URL+"?t="+Date.now(),{method:"GET",redirect:"follow"});
-    const txt=await r.text();
-    const d=JSON.parse(txt);
-    if(d.ok&&d.data) return d.data;
-  }catch(e){console.log("cloudLoad error:",e);}
-  return null;
+function cloudLoad(){
+  return new Promise(resolve=>{
+    const cbName="cb_"+Date.now();
+    const script=document.createElement("script");
+    let done=false;
+    window[cbName]=function(d){
+      done=true;
+      delete window[cbName];
+      script.remove();
+      if(d&&d.ok&&d.data) resolve(d.data);
+      else resolve(null);
+    };
+    script.src=GS_URL+"?callback="+cbName+"&t="+Date.now();
+    script.onerror=function(){
+      if(!done){done=true;delete window[cbName];script.remove();resolve(null);}
+    };
+    setTimeout(function(){
+      if(!done){done=true;delete window[cbName];script.remove();resolve(null);}
+    },8000);
+    document.head.appendChild(script);
+  });
 }
 
 async function saveS(){
