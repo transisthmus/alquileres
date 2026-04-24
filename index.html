@@ -432,6 +432,9 @@ function cloudLoad(){
 }
 
 async function saveS(){
+  // Preservar PIN en los datos
+  const pin=localStorage.getItem("vic_pin");
+  if(pin) S.pin=pin;
   localSave();
   showPill("⏳ Guardando...","saving");
   clearTimeout(saveTimer);
@@ -450,23 +453,33 @@ function updateDots(){for(let i=0;i<4;i++)document.getElementById("pd"+i).classN
 
 async function handlePin(){
   const entered=pinEntry; pinEntry=""; updateDots();
-  const stored=localStorage.getItem("vic_pin");
 
   if(pinMode==="enter"){
-    if(!stored){
-      // First time — set PIN
+    // Cargar datos de la nube primero
+    showLoad("Verificando...");
+    let data=await cloudLoad();
+    if(!data) data=localLoad();
+    hideLoad();
+
+    if(!data){
+      // Primera vez — no hay datos en ningún sitio
       pinMode="confirm"; pinConfirm=entered;
       document.getElementById("pin-sub").textContent="PIN nuevo — confírmalo otra vez";
       return;
     }
-    if(entered===stored){
-      // Correct PIN — load data
-      showLoad("Cargando tus datos...");
-      let data=await cloudLoad();
-      if(!data) data=localLoad();
-      if(!data) data=JSON.parse(JSON.stringify(DEFAULT));
+
+    // Verificar PIN contra los datos guardados
+    const storedPin=data.pin||localStorage.getItem("vic_pin");
+    if(!storedPin){
+      // Datos existen pero sin PIN — primer acceso desde nuevo dispositivo
+      pinMode="confirm"; pinConfirm=entered;
+      document.getElementById("pin-sub").textContent="Crea tu PIN para este dispositivo";
+      return;
+    }
+
+    if(entered===storedPin){
+      localStorage.setItem("vic_pin",entered);
       S=data;
-      hideLoad();
       launchApp();
     } else {
       document.getElementById("pin-error").textContent="PIN incorrecto";
@@ -475,8 +488,15 @@ async function handlePin(){
   } else if(pinMode==="confirm"){
     if(entered===pinConfirm){
       localStorage.setItem("vic_pin",entered);
-      S=JSON.parse(JSON.stringify(DEFAULT));
-      showLoad("Configurando tu app...");
+      // Cargar datos existentes o usar DEFAULT
+      showLoad("Cargando...");
+      let data=await cloudLoad();
+      if(!data) data=localLoad();
+      if(!data) data=JSON.parse(JSON.stringify(DEFAULT));
+      hideLoad();
+      data.pin=entered; // guardar PIN en los datos
+      S=data;
+      showLoad("Guardando configuración...");
       await cloudSave(S);
       hideLoad();
       launchApp();
