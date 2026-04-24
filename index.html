@@ -396,13 +396,14 @@ function localLoad(){
 async function cloudSave(data){
   localSave();
   try{
-    await fetch(GS_URL,{
+    const r=await fetch(GS_URL,{
       method:"POST",
       headers:{"Content-Type":"text/plain"},
-      body:JSON.stringify(data),
-      mode:"no-cors"
+      body:JSON.stringify(data)
     });
-    showPill("✓ Guardado en Google Sheets");
+    const d=await r.json();
+    if(d.ok) showPill("✓ Guardado en Google Sheets");
+    else showPill("⚠️ Error al guardar","error");
   }catch(e){
     showPill("⚠️ Guardado local (sin conexión)","error");
   }
@@ -410,11 +411,11 @@ async function cloudSave(data){
 
 async function cloudLoad(){
   try{
-    const r=await fetch(GS_URL+"?t="+Date.now());
-    if(!r.ok) throw new Error();
-    const d=await r.json();
+    const r=await fetch(GS_URL+"?t="+Date.now(),{method:"GET",redirect:"follow"});
+    const txt=await r.text();
+    const d=JSON.parse(txt);
     if(d.ok&&d.data) return d.data;
-  }catch(e){}
+  }catch(e){console.log("cloudLoad error:",e);}
   return null;
 }
 
